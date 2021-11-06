@@ -13,7 +13,8 @@
 #include "simAVRHeader.h"
 #endif
 
-enum states {start, init, nextLed} state ;
+enum states {start, init, nextLed, pause, r, rr} state ;
+unsigned char t = 0x00 ;
 
 volatile unsigned char TimerFlag = 0;
 void TimerISR() { TimerFlag = 1;}
@@ -50,7 +51,20 @@ void Tick(){
 			state = nextLed ;
 			break ;
 		case nextLed:
-			state = nextLed ;
+			if((~PINA & 0x01) == 0x01) state = pause ;
+			else state = nextLed ;
+			break ;
+		case pause:
+			if((~PINA & 0x01) == 0x01) state = pause ;
+			else state = r ;
+			break ;
+		case r:
+			if((~PINA & 0x01) == 0x01) state = rr ;
+			else state = r ;
+			break ;
+		case rr:
+			if((~PINA & 0x01) == 0x01) state = rr ;
+			else state = init ;
 			break ;
 		default:
 			state = start ;
@@ -63,7 +77,26 @@ void Tick(){
 			PORTB = 0x01 ;
 			break ;
 		case nextLed:
-			PORTB = (PORTB == 0x04) ? 0x01 : PORTB << 1 ;
+			if(t == 0x00){
+				if(PORTB == 0x04){
+					PORTB = PORTB >> 1 ;
+					t = 0x01 ;
+				}
+				else PORTB = PORTB << 1 ;
+			}
+			else{
+				if(PORTB == 0x01){
+					PORTB = PORTB << 1 ;
+					t = 0x00 ;
+				}
+				else PORTB = PORTB >> 1 ;
+			}
+			break ;
+		case pause:
+			break ;
+		case r:
+			break ;
+		case rr:
 			break ;
 		default: break ;
 	}
@@ -72,7 +105,8 @@ void Tick(){
 
 int main(void) {
 	DDRB = 0xFF ; PORTB = 0x00 ;
-	TimerSet(1000) ;
+	DDRA = 0x00 ; PORTA = 0xFF ;
+	TimerSet(300) ;
 	TimerOn() ;
     while (1) {
 	    Tick() ;
