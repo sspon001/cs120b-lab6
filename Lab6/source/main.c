@@ -13,7 +13,7 @@
 #include "simAVRHeader.h"
 #endif
 
-enum states {start, init, nextLed, pause, r, rr} state ;
+enum states {start, begin, init, reset, plus, minus, plusOn, minusOn, add, sub} state ;
 unsigned char t = 0x00 ;
 
 volatile unsigned char TimerFlag = 0;
@@ -45,26 +45,51 @@ void TimerSet (unsigned long M) {
 void Tick(){
 	switch(state){
 		case start:
+			state = begin ;
+			break ;
+		case begin:
 			state = init ;
 			break ;
 		case init:
-			state = nextLed ;
+			if((~PINA & 0x03) == 0x03) state = reset ;
+			else if((~PINA & 0x03) == 0x01) state = add ;
+			else if((~PINA & 0x03) == 0x02) state = sub ;
 			break ;
-		case nextLed:
-			if((~PINA & 0x01) == 0x01) state = pause ;
-			else state = nextLed ;
-			break ;
-		case pause:
-			if((~PINA & 0x01) == 0x01) state = pause ;
-			else state = r ;
-			break ;
-		case r:
-			if((~PINA & 0x01) == 0x01) state = rr ;
-			else state = r ;
-			break ;
-		case rr:
-			if((~PINA & 0x01) == 0x01) state = rr ;
+		case reset:
+			if((~PINA & 0x03) == 0x03) state = reset ;
 			else state = init ;
+			break ;	
+		case plus:
+			if((~PINA & 0x03) == 0x01) state = plus ;
+			else state = init ;
+			break ;
+		case plusOn:
+			if((~PINA & 0x03) == 0x01){
+				t++ ;
+				state = plusOn ;
+				if(t >= 0x0A) state = add ;
+			}
+			else state = plus ;
+			break ;
+		case add:
+			if(t >= 0x0A) t = 0x00 ;
+			state = plusOn ;
+			break ;
+		case minus:
+			if((~PINA & 0x03) == 0x02) state = minus ;
+			else state = init ;
+			break ;
+		case minusOn:
+			if((~PINA & 0x03) == 0x02){
+				state = minusOn ;
+				t++ ;
+				if(t >= 0x0A) state = sub ;
+			}
+			else state = minus ;
+			break ;
+		case sub:
+			if(t >= 0x0A) t = 0x00 ;
+			state = minusOn ;
 			break ;
 		default:
 			state = start ;
@@ -72,33 +97,33 @@ void Tick(){
 	}
 	switch(state){
 		case start:
+			PORTB = 0x07 ;
+			break ;
+		case begin:
+			PORTB = 0x07 ;
 			break ;
 		case init:
-			PORTB = 0x01 ;
+			t = 0x00 ;
+		case plusOn:
 			break ;
-		case nextLed:
-			if(t == 0x00){
-				if(PORTB == 0x04){
-					PORTB = PORTB >> 1 ;
-					t = 0x01 ;
-				}
-				else PORTB = PORTB << 1 ;
-			}
-			else{
-				if(PORTB == 0x01){
-					PORTB = PORTB << 1 ;
-					t = 0x00 ;
-				}
-				else PORTB = PORTB >> 1 ;
-			}
+		case plus:
 			break ;
-		case pause:
+		case minusOn:
 			break ;
-		case r:
+		case minus:
 			break ;
-		case rr:
+		case add:
+			if(PORTB < 0x09) PORTB = PORTB + 1 ;
 			break ;
-		default: break ;
+		case sub:
+			if(PORTB > 0x00) PORTB = PORTB - 1 ;
+			break ;
+		case reset:
+			PORTB = 0x00 ;
+			break ;
+		default:
+			PORTB = 0x07 ;
+			break ;
 	}
 }
 
@@ -106,7 +131,7 @@ void Tick(){
 int main(void) {
 	DDRB = 0xFF ; PORTB = 0x00 ;
 	DDRA = 0x00 ; PORTA = 0xFF ;
-	TimerSet(300) ;
+	TimerSet(100) ;
 	TimerOn() ;
     while (1) {
 	    Tick() ;
